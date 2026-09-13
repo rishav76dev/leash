@@ -1,8 +1,86 @@
-# Leash Agent
+# Leash
 
-Leash is a revocable, capability-scoped gate for autonomous agents. It reads ENSv2 authority on Sepolia, issues a single-use credential for an allowed capability, re-checks authority immediately before the protected service call, and records the decision in an append-only audit stream.
+Leash is an explainable authorization layer for agent software. It checks
+whether an identified agent wallet is allowed to use a capability, issues a
+short-lived credential when permission exists, and rejects the next request
+after the permission is revoked.
+
+The current prototype uses:
+
+- ERC-8004 for agent identity.
+- ENSv2 on Ethereum Sepolia for authority.
+- Capability-scoped, address-bound, single-use credentials.
+- A live authority re-check immediately before protected service execution.
+- An audit trail of authorization decisions.
+
+This is currently permission infrastructure for agents, not a fully autonomous
+agent. The `researcher` agent and `inference.call` capability are demonstration
+inputs used to show the authorization flow.
+
+## How it works
+
+```text
+Agent wallet + capability
+          |
+          v
+    Leash authorization gate
+          |
+    Read ENSv2 role on Sepolia
+          |
+     +----+----+
+     |         |
+   ALLOW     DENY
+     |
+ Short-lived credential
+     |
+ Live ENSv2 re-check
+     |
+ Protected service call
+```
+
+The important property is revocation. An agent can be allowed at one block,
+then denied on its next request after its ENSv2 role is removed.
+
+## Demo flow
+
+1. Open the dashboard.
+2. Use the configured demo wallet and select `inference.call`.
+3. Click **Evaluate authority** and show `ALLOW`.
+4. Point out the detected ENS role, block number, and 30-second credential.
+5. Revoke the agent's role in the ENS interface or through the protected admin
+   route.
+6. Repeat the exact same request and show `DENY`.
+7. Open the audit page and show both decisions.
+
+Suggested explanation:
+
+> ERC-8004 identifies the agent wallet. ENSv2 defines what it may do. Leash
+> issues a narrowly scoped credential only while that authority exists, then
+> checks authority again before execution.
+
+## Repository structure
+
+```text
+src/
+  chain/       ENSv2 client and contract interaction
+  gate/        capability checks and credential handling
+  api/         shared runtime and serialization
+  audit/       decision audit log
+  service/     protected service implementation
+  mcp/         local MCP interface
+  cli/         local demos and operational commands
+
+web/
+  app/         Next.js pages and API routes
+```
+
+The `src` directory is the backend/domain layer. The `web` directory contains
+the Next.js frontend and server-side API routes. The API routes import logic
+from `src`, so both directories must be deployed together.
 
 ## Run locally
+
+Requirements: Bun 1.1 or newer.
 
 ```bash
 cp .env.example .env.local
@@ -10,20 +88,135 @@ bun install
 bun run dev
 ```
 
-Open `http://localhost:3000`. Without a configured ENSv2 resource, the UI intentionally fails closed. To exercise the complete local mechanism without a wallet or RPC, run:
+Open <http://localhost:3000>.
+
+Useful commands:
 
 ```bash
-bun run demo
+bun test                 # unit tests
+bunx tsc --noEmit        # type check
+bun run build            # production build
+bun run verify           # Sepolia/config health check
+bun run demo             # deterministic local demo
+bun run gate             # standalone local HTTP gate
+bun run mcp              # standalone local MCP server
 ```
 
-The demo proves allow, service use, revocation, and post-revocation refusal. Other commands are `bun run test`, `bun run build`, `bun run verify`, `bun run mcp`, and `bun run gate`.
+The deterministic CLI demo does not require a wallet or RPC. The live
+dashboard requires a configured ENSv2 resource and RPC endpoint.
 
-## Live configuration
+## Configuration
 
-Set `LEASH_RESOURCE_ID` to the canonical ENSv2 resource ID owned by the deployment. For the ETHOnline hackathon deployment, also set `LEASH_REGISTRY` to the registry that issued the name. `LEASH_ADMIN_ENABLED=true` plus `PRIVATE_KEY` enables the protected grant/revoke API; never expose that key to the browser. ERC-8004 identifies the agent, while ENSv2 is the authorization source.
+Copy `.env.example` to `.env.local`. Never commit `.env.local` or display it in
+screenshots or recordings.
 
-The live Sepolia proof used `leash.eth`, agent `0xb2F0C31e0C3a0dAE5298f7A70478637a64F55FA5`, and these public transactions:
+Live dashboard configuration:
 
-- Grant: [0x56b9…ded8](https://sepolia.etherscan.io/tx/0x56b9c367003703e17307386c7fca8147ba5939ef5d3ab9948a6ecea1a517ded8)
-- Revoke: [0x650a…bdfe](https://sepolia.etherscan.io/tx/0x650a58a39cb4a516033344b7c3faf1d65e56515f3c67dd6d20640f97516ebdfe)
-- Re-grant: [0x9296…ff02](https://sepolia.etherscan.io/tx/0x92967d7fe172b08df26f31e81176fbab233e1a7996b028a46373f6470dc0ff02)
+```env
+LEASH_RESOURCE_ID=0
+LEASH_RESOURCE_LABEL=leash.eth
+LEASH_REGISTRY=0x...
+LEASH_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+LEASH_CREDENTIAL_SECRET=<long-random-secret>
+LEASH_CREDENTIAL_TTL=30
+```
+
+Server-side role administration is optional:
+
+```env
+LEASH_ADMIN_ENABLED=true
+PRIVATE_KEY=<server-side Sepolia admin key>
+```
+
+The browser must never receive `PRIVATE_KEY`, `AGENT_PRIVATE_KEY`, or
+`LEASH_CREDENTIAL_SECRET`.
+
+## API routes
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/health` | Chain and configuration health |
+| `GET` | `/api/v1/capabilities` | Supported capabilities |
+| `POST` | `/api/v1/decisions` | Evaluate agent authority |
+| `GET` | `/api/v1/audit` | Recent decision entries |
+| `GET` | `/api/v1/receipt` | Service receipt |
+| `POST` | `/api/v1/service/:capability` | Consume a protected credential |
+| `POST` | `/api/v1/authority/grant` | Admin-only role grant |
+| `POST` | `/api/v1/authority/revoke` | Admin-only role revoke |
+
+Example:
+
+```bash
+curl -X POST https://your-domain.example/api/v1/decisions \
+  -H 'content-type: application/json' \
+  -d '{"agentName":"researcher","agentAddress":"0x...","capability":"inference.call"}'
+```
+
+## Deployment
+
+Deploy the entire repository as one Next.js project on Vercel. The included
+`vercel.json` points Vercel at the `web/.next` output generated by the current
+build command.
+
+```text
+Framework: Next.js
+Root directory: repository root
+Build command: bun run build
+Output directory: web/.next
+```
+
+Add the configuration values to Vercel's server-side environment settings.
+There is no separate backend deployment required for the current architecture:
+the Next.js API routes execute the `src` backend logic on the server.
+
+The temporary audit file uses `/tmp` on Vercel and is not durable across
+serverless instances. The on-chain ENSv2 state remains the authority source.
+
+## Current limitations
+
+- The project does not yet contain a real autonomous agent loop.
+- The demo currently maps `inference.call` to an ENS administrative role. A
+  dedicated application permission registry is required before production use.
+- Audit storage is local/process-based and should move to durable storage for
+  production.
+- Browser-based wallet administration is not implemented.
+- The server-side admin routes should be protected with stronger operational
+  controls before production use.
+
+## Future plan
+
+### 1. Add a real agent client
+
+Build a bounded research agent that receives a task, chooses a capability,
+requests a credential, calls the protected service, and handles denial.
+
+### 2. Add an application permission registry
+
+Replace the demonstration role mapping with explicit application permissions
+that cannot accidentally grant control over ENS records.
+
+### 3. Add durable audit storage
+
+Persist decision events with request IDs, block numbers, reason codes, latency,
+and authority transaction links.
+
+### 4. Add wallet-based administration
+
+Allow authorized owners to grant and revoke permissions from the dashboard using
+wallet signatures.
+
+### 5. Harden production security
+
+Add key rotation, replay-prevention storage, rate limiting, authentication for
+administrative routes, and deployment monitoring.
+
+## Project status
+
+The honest current description is:
+
+> Leash is permission infrastructure for agents, with ERC-8004 agent identity,
+> a live ENSv2-backed authorization gate, scoped credentials, and revocation
+> checks.
+
+It is not yet an autonomous agent platform or a production-ready permission
+registry.
