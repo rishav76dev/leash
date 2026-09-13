@@ -1,10 +1,6 @@
 /**
  * Append-only decision log.
  *
- * Shaped like Hedera's HCS: an ordered stream of immutable messages. When
- * Hedera credentials are present, each decision is also submitted to a real
- * HCS topic for a consensus timestamp.
- *
  * Note what we do NOT need to build: the registry already emits
  * EACRolesChanged(resource, account, oldBitmap, newBitmap) on every grant and
  * revoke, so the authority-change trail is on-chain and free. This log records
@@ -28,24 +24,14 @@ export interface AuditEntry {
   latencyMs: number;
   timestamp: number;
   reverted: boolean;
-  hcs?: unknown;
-}
-
-export interface HcsSink {
-  readonly enabled: boolean;
-  readonly topicId?: string;
-  submit(entry: AuditEntry): Promise<unknown>;
 }
 
 export class AuditLog {
   readonly entries: AuditEntry[] = [];
   private readonly path?: string;
-  private readonly hcs?: HcsSink;
-  private pending: Promise<void> = Promise.resolve();
 
-  constructor(opts?: { path?: string; hcs?: HcsSink }) {
+  constructor(opts?: { path?: string }) {
     this.path = opts?.path;
-    this.hcs = opts?.hcs;
     if (this.path) mkdirSync(dirname(this.path), { recursive: true });
   }
 
@@ -70,24 +56,7 @@ export class AuditLog {
       appendFileSync(this.path, JSON.stringify(entry) + "\n");
     }
 
-    // HCS submission is fire-and-forget so it never adds latency to a
-    // permission decision. The local stream is the source of truth.
-    if (this.hcs?.enabled) {
-      this.pending = this.pending.then(async () => {
-        try {
-          entry.hcs = await this.hcs!.submit(entry);
-        } catch (e) {
-          entry.hcs = { error: String(e).slice(0, 120) };
-        }
-      });
-    }
-
     return entry;
-  }
-
-  /** Wait for any in-flight HCS submissions. */
-  async flush(): Promise<void> {
-    await this.pending;
   }
 
   tail(n = 10): AuditEntry[] {

@@ -6,7 +6,6 @@ import { canonicalId, decodeRoleBitmap, CONTRACTS, SEPOLIA_CHAIN_ID } from "../c
 import { CAPABILITIES, CAPABILITY_IDS } from "../gate/capabilities.ts";
 import { CredentialMinter } from "../gate/credential.ts";
 import { LeashGate, type Decision } from "../gate/gate.ts";
-import { Agent0Reputation } from "../reputation/agent0.ts";
 import { MeteredService } from "../service/metered.ts";
 
 const ZERO_RESOURCE = 0n;
@@ -43,15 +42,12 @@ export function getRuntime(): LeashRuntime {
     secret: process.env.LEASH_CREDENTIAL_SECRET,
     ttlSeconds: Number(process.env.LEASH_CREDENTIAL_TTL ?? 30),
   });
-  const reputation = new Agent0Reputation();
   const gate = new LeashGate({
     client,
     resource: configuredResource(),
     resourceLabel: process.env.LEASH_RESOURCE_LABEL,
     minter,
     audit,
-    reputation: reputation.enabled ? reputation : undefined,
-    minReputation: Number(process.env.LEASH_MIN_REPUTATION ?? 0),
   });
   let admin: Ensv2Client | null = null;
   if (process.env.LEASH_ADMIN_ENABLED === "true" && process.env.PRIVATE_KEY) {
@@ -105,8 +101,6 @@ export function configSummary() {
     registry: rt.client.registry,
     resource: rt.gate.resource.toString(),
     resourceLabel: rt.gate.resourceLabel,
-    reputationEnabled: Boolean(process.env.GRAPH_API_KEY),
-    hcsEnabled: false,
     configured: rt.gate.resource !== ZERO_RESOURCE,
     contracts: { ethRegistry: CONTRACTS.ethRegistry },
   };
