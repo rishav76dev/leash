@@ -37,7 +37,12 @@ export function getRuntime(): LeashRuntime {
   const client = new Ensv2Client({
     registry: configuredRegistry && isAddress(configuredRegistry) ? configuredRegistry : undefined,
   });
-  const audit = new AuditLog({ path: process.env.AUDIT_LOG_PATH });
+  // Vercel's deployment filesystem is read-only; only /tmp is writable and
+  // its contents are intentionally ephemeral between serverless instances.
+  const auditPath = process.env.VERCEL
+    ? "/tmp/leash-audit.ndjson"
+    : process.env.AUDIT_LOG_PATH;
+  const audit = new AuditLog({ path: auditPath });
   const minter = new CredentialMinter({
     secret: process.env.LEASH_CREDENTIAL_SECRET,
     ttlSeconds: Number(process.env.LEASH_CREDENTIAL_TTL ?? 30),
