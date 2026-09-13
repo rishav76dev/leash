@@ -1,8 +1,8 @@
-# Leash Agent — ENS + The Graph demo
+# Leash Agent — ENS authorization demo
 
-This guide is for recording the hackathon demo from the `ens-graph` branch.
-The branch uses ENSv2 on Sepolia for authority and The Graph/Agent0 for
-reputation. Hedera and x402 are intentionally not part of this demo.
+This guide is for recording the hackathon demo. The app uses ENSv2 on Sepolia
+for authority and ERC-8004 for agent identity. Payment settlement is
+intentionally not part of this demo.
 
 ## What the project does
 
@@ -12,8 +12,7 @@ giving an agent a permanent API key, the system:
 1. Receives an agent, capability, and wallet address.
 2. Reads the agent's ENSv2 authority on Sepolia.
 3. Checks the requested capability against the ENS role.
-4. Optionally checks the agent's ERC-8004/Agent0 reputation through The Graph.
-5. Returns either `ALLOW` with a short-lived, capability-scoped credential or
+4. Returns either `ALLOW` with a short-lived, capability-scoped credential or
    `DENY` with a stable reason.
 6. Re-checks authority immediately before the protected service call.
 7. Writes the decision to an append-only audit stream.
@@ -40,11 +39,10 @@ include:
 
 - ENSv2/Sepolia resource, registry, RPC, and credential settings
 - The demo agent address and agent private key
-- `GRAPH_API_KEY` and `LEASH_MIN_REPUTATION`
 - Local audit-log configuration
 
-The browser must never receive `PRIVATE_KEY`, `AGENT_PRIVATE_KEY`,
-`LEASH_CREDENTIAL_SECRET`, or `GRAPH_API_KEY`.
+The browser must never receive `PRIVATE_KEY`, `AGENT_PRIVATE_KEY`, or
+`LEASH_CREDENTIAL_SECRET`.
 
 ## Verify before the demo
 
@@ -108,18 +106,7 @@ Point out:
 Explain that ENS is the source of truth for who may do what. The application
 does not use a hardcoded allowlist as the authority boundary.
 
-### 3. Show The Graph reputation check
-
-Point out that the reputation gate is optional and fail-closed when configured.
-The runtime queries the Agent0/ERC-8004 data source through The Graph and can
-reject an agent that does not meet `LEASH_MIN_REPUTATION`.
-
-If the configured agent has a live reputation record, show the reputation
-value in the decision response or health/dashboard data. If the subgraph does
-not return a record during recording, clearly label the result as an
-unavailable/missing reputation response rather than claiming a live score.
-
-### 4. Use the protected service
+### 3. Use the protected service
 
 Use the credential returned by the allowed decision to call the protected
 service. Show the successful response and the receipt/audit information.
@@ -183,26 +170,6 @@ The demo directly exercises the ENS feature: grant/allow, revoke/deny, and
 narrower re-grant. Without ENSv2, the application would fall back to a static
 allowlist and would lose the on-chain authority and revocation proof.
 
-## Why The Graph is a sponsor integration
-
-The Graph supplies the reputation data used by the gate. Leash does not invent
-its own reputation score. It queries indexed ERC-8004/Agent0 information so an
-agent's reputation can become an input to an authorization decision.
-
-This makes the integration useful in the execution path:
-
-```text
-ENSv2 authority + Agent0 reputation via The Graph
-              -> Leash decision
-              -> scoped credential or denial
-```
-
-The Graph also makes the reputation layer queryable without writing custom
-indexing logic for every registry deployment. In the demo, describe it as the
-reputation signal that complements ENS authority: ENS answers “is this agent
-allowed to perform this capability?”, while The Graph helps answer “does this
-agent meet the configured trust threshold?”
-
 ## What is implemented versus intentionally out of scope
 
 Implemented for this branch:
@@ -211,15 +178,11 @@ Implemented for this branch:
 - ENSv2 Sepolia authority reads and protected grant/revoke routes
 - Capability-scoped credentials
 - Live authority re-check before service execution
-- Agent0/The Graph reputation adapter
 - Append-only audit, decisions, receipt, and health endpoints
 - Local CLI demo, tests, and production frontend build
 
 Not part of this recording:
 
-- Hedera HCS audit sink
-- Hedera x402 or Blocky402 payment settlement
-- A claim that all reputation data is live if the subgraph is unavailable
 
 ## Local fallback
 
@@ -245,5 +208,3 @@ Sepolia links for the primary sponsor demo whenever the network is available.
 - [ ] ENS role revoked
 - [ ] Identical follow-up request is denied
 - [ ] Audit trail shows allow and deny
-- [ ] The Graph reputation behavior is described accurately
-- [ ] No Hedera functionality is claimed for this branch

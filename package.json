@@ -5,9 +5,9 @@
   "type": "module",
   "module": "src/index.ts",
   "scripts": {
-    "dev": "next dev web",
-    "build": "next build web",
-    "start": "next start web",
+    "dev": "bun --env-file=.env.local x next dev web",
+    "build": "bun --env-file=.env.local x next build web",
+    "start": "bun --env-file=.env.local x next start web",
     "verify": "bun run src/cli/verify.ts",
     "demo": "bun run src/cli/demo.ts",
     "ablation": "bun run src/cli/ablation.ts",
@@ -20,7 +20,6 @@
   },
   "dependencies": {
     "agent0-sdk": "^1.7.0",
-    "@hashgraph/sdk": "^2.81.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "next": "^15.5.0",
     "react": "^19.1.0",

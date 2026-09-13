@@ -4,7 +4,7 @@ Updated: 2026-09-11
 
 ## Current project
 
-Leash is a revocable, capability-scoped authorization gate for autonomous agents. ENSv2 controls authority, Agent0/The Graph supplies optional reputation, MCP exposes the same gate to agents, and Hedera x402/HCS is the planned payment and audit layer.
+Leash is a revocable, capability-scoped authorization gate for autonomous agents. ENSv2 controls authority, Agent0/The Graph supplies optional reputation, and MCP exposes the same gate to agents.
 
 ## Completed
 
@@ -51,7 +51,6 @@ These must exist only in `.env.local` and must never be committed or pasted into
 PRIVATE_KEY=
 AGENT_PRIVATE_KEY=
 GRAPH_API_KEY=
-HEDERA_PRIVATE_KEY=
 ```
 
 Public/configuration values belong in `.env.local` as well:
@@ -76,28 +75,11 @@ Current capabilities still reuse ENS administrative roles such as `SET_RESOLVER`
 - Add tests for unregistered agent, low score, API outage, and valid score.
 - Keep the gate fail-closed for configured reputation policies.
 
-### 3. Implement real Hedera x402 payment
+### 3. Connect MCP to service calls
 
-- Add the official x402 Hedera packages.
-- Configure a Hedera testnet payer and merchant account.
-- Return a real HTTP 402 payment challenge.
-- Verify and settle payment through Blocky402.
-- Return settlement transaction/reference data to the caller.
-- Add tests for missing, invalid, replayed, and successful payment proofs.
+The current MCP tools use the same gate as the web service. Keep the MCP path aligned with the live authority and reputation checks.
 
-### 4. Implement HCS audit submission
-
-- Create/configure an HCS topic.
-- Implement an `HcsSink` using the Hedera SDK.
-- Submit decision and settlement records asynchronously.
-- Expose HCS topic ID, sequence number, consensus timestamp, and error state in `/api/v1/audit`.
-- Add retry and flush behavior for shutdown/demo completion.
-
-### 5. Connect MCP to payment-aware service calls
-
-The current MCP tools use the gate but do not yet perform x402 payment. Add a payment-capable tool that requests authority, calls the paid service, and returns both the service result and proof references.
-
-### 6. Build the executable live guided demo
+### 4. Build the executable live guided demo
 
 The local CLI demo works. The submission demo still needs one command or page that runs:
 
@@ -106,13 +88,13 @@ The local CLI demo works. The submission demo still needs one command or page th
 3. Decision and payment are recorded.
 4. Owner revokes authority.
 5. The next call is denied.
-6. ENS transaction, Hedera settlement, and HCS evidence are displayed.
+6. ENS transaction and audit evidence are displayed.
 
 ### 7. Complete submission evidence
 
 - Deploy publicly.
 - Add live deployment URL to README.
-- Add Graph evidence and HCS evidence.
+- Add Graph evidence.
 - Add final grant/revoke/payment explorer links.
 - Run the static-allowlist ablation.
 - Record the final demo video.
@@ -120,7 +102,4 @@ The local CLI demo works. The submission demo still needs one command or page th
 ## Current blockers
 
 - Graph API key and Agent0 registration/reputation evidence are not configured.
-- Hedera account, merchant account, HCS topic, and private key are not configured.
-- Real x402/Blocky402 settlement is not implemented yet.
-- HCS submission is not implemented yet.
 - The capability-to-ENS-role mapping still needs replacement before production or submission claims.

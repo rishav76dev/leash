@@ -20,7 +20,6 @@ import { decodeRoleBitmap, toResourceHex } from "../chain/ensv2.ts";
 import { getCapability, USED_ROLES } from "./capabilities.ts";
 import { CredentialMinter } from "./credential.ts";
 import type { AuditLog } from "../audit/log.ts";
-import type { ReputationSource } from "../reputation/agent0.ts";
 
 export type Verdict = "ALLOW" | "DENY";
 
@@ -42,7 +41,6 @@ export interface Decision {
   timestamp: number;
   /** True when the chain reverted rather than returning false. */
   reverted: boolean;
-  reputation?: { score: number | null; note: string };
 }
 
 export type DenyCode =
@@ -52,8 +50,6 @@ export type DenyCode =
   | "NAME_EXPIRED"
   | "ROLE_NOT_HELD"
   | "NO_ROLES_ON_RESOURCE"
-  | "REPUTATION_BELOW_THRESHOLD"
-  | "REPUTATION_UNAVAILABLE";
 
 export interface GateOptions {
   client: Ensv2Client;
@@ -67,9 +63,6 @@ export interface GateOptions {
   resourceLabel?: string;
   minter?: CredentialMinter;
   audit?: AuditLog;
-  reputation?: ReputationSource;
-  /** Minimum ERC-8004 reputation score, when a source is configured. */
-  minReputation?: number;
 }
 
 export class LeashGate {
@@ -78,8 +71,6 @@ export class LeashGate {
   readonly resourceLabel: string;
   readonly minter: CredentialMinter;
   private readonly audit?: AuditLog;
-  private readonly reputation?: ReputationSource;
-  private readonly minReputation: number;
 
   checks = 0;
 
@@ -89,8 +80,6 @@ export class LeashGate {
     this.resourceLabel = opts.resourceLabel ?? toResourceHex(opts.resource);
     this.minter = opts.minter ?? new CredentialMinter();
     this.audit = opts.audit;
-    this.reputation = opts.reputation;
-    this.minReputation = opts.minReputation ?? 0;
   }
 
   /**
@@ -193,28 +182,13 @@ export class LeashGate {
       );
     }
 
-    // 5. Optional second gate: ERC-8004 reputation via The Graph.
-    let rep: Decision["reputation"];
-    if (this.reputation) {
-      rep = await this.reputation.scoreFor(agentAddress);
-      if (this.minReputation > 0 && (rep.score === null || rep.score < this.minReputation)) {
-        const unavailable = rep.score === null;
-        return finish(
-          "DENY",
-          unavailable ? "REPUTATION_UNAVAILABLE" : "REPUTATION_BELOW_THRESHOLD",
-          unavailable ? `reputation unavailable — required minimum is ${this.minReputation}` : `reputation ${rep.score} below required ${this.minReputation}`,
-          { block, roleBitmap: check.bitmap, reputation: rep },
-        );
-      }
-    }
-
-    // 6. Authorised. Mint a credential scoped to exactly this capability.
+    // 5. Authorised. Mint a credential scoped to exactly this capability.
     const credential = this.minter.mint(agentName, agentAddress, capability, block);
     return finish(
       "ALLOW",
       "AUTHORISED",
       `holds ROLE_${cap.roleName}; credential scoped to '${capability}', ttl ${this.minter.ttlSeconds}s`,
-      { block, roleBitmap: check.bitmap, credential, reputation: rep },
+      { block, roleBitmap: check.bitmap, credential },
     );
   }
 

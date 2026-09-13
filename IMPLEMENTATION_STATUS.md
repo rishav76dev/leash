@@ -18,7 +18,6 @@ Updated 2026-09-11.
 - Configure and register a Leash-owned ENSv2 resource/subname on Sepolia, then capture grant, allow, revoke, and deny transaction links.
 - Replace the temporary capability-to-EAC-role mapping with an owned application permission registry/resolver. Generic ENS administrative roles must not be treated as arbitrary business permissions in production.
 - Supply a Graph API key and an actual ERC-8004/Agent0 registration; capture a live reputation query and evidence.
-- Supply Hedera testnet credentials and implement real x402/Blocky402 settlement plus HCS topic submission. The current ledger and HCS flag are intentionally not presented as real settlement.
 - Run the two real ablation experiments and publish reproducible results.
 - Deploy the app, add wallet-signed browser authority changes, and record the demo video/explorer links.
 
